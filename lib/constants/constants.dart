@@ -1,8 +1,7 @@
 /// Constants used throughout the application
 class AppConstants {
   // File names for saved data
-  static const String faceDataWalkingFilename = 'face_data_walk.txt';
-  static const String faceDataStandingFilename = 'face_data_stand.txt';
+  static const String faceDataFilename = 'face_tracking_data.json';
 
   // Face detection settings
   static const double smilingThreshold =
@@ -19,4 +18,8 @@ class AppConstants {
   static const double dotRadius = 5.0; // Radius of the face tracking dot
   static const int statusMessageDuration =
       3; // Duration in seconds for status messages
+
+  // Activity types
+  static const String activityWalking = 'walking';
+  static const String activityStanding = 'standing';
 }

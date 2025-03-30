@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_face_tracking_exercise_app/screens/face_tracking_screen.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'device/mlkit_face_camera_repository.dart';
+import 'screens/face_tracking_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

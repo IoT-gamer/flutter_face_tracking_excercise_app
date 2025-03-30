@@ -1,14 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:bloc/bloc.dart';
 import 'package:camera/camera.dart';
 import 'package:circular_buffer/circular_buffer.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_face_tracking_exercise_app/constants/constants.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../constants/constants.dart';
 import '../device/mlkit_face_camera_repository.dart';
+import '../models/face_tracking_session.dart';
 
 part 'face_detection_state.dart';
 
@@ -21,39 +23,28 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
 
   StreamSubscription? _faceDetectionStreamSubscription;
   CameraController? _cameraController;
-  late File _fileWalking;
-  late File _fileStanding;
+  late File _dataFile;
   late double _screenWidth;
   late double _screenHeight;
-  static const String _faceDataWalkingFilename =
-      AppConstants.faceDataWalkingFilename;
-  static const String _faceDataStandingFilename =
-      AppConstants.faceDataStandingFilename;
+  static const String _faceDataFilename = AppConstants.faceDataFilename;
 
   //get path for saving face detection result
   Future<String?> get _localPath async {
-    // final directory = await getApplicationDocumentsDirectory();
     final directory = await getExternalStorageDirectory();
     print('directory path: ${directory?.path}');
     return directory?.path;
   }
 
-  // get file for saving face detection result
-  Future<File> get _localFileWalking async {
+  // get unified data file for saving face detection results
+  Future<File> get _localDataFile async {
     final path = await _localPath;
-    return File('$path/$_faceDataWalkingFilename');
-  }
-
-  Future<File> get _localFileStanding async {
-    final path = await _localPath;
-    return File('$path/$_faceDataStandingFilename');
+    return File('$path/$_faceDataFilename');
   }
 
   // create isolate for face detection
   Future<void> createIsolate() async {
     try {
       await _mlkitFaceCameraRepository.createIsolate();
-      //appLifecycleListener();
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }
@@ -84,8 +75,7 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
       await getCamera();
       await initializeCamera();
       await createIsolate();
-      _fileWalking = await _localFileWalking;
-      _fileStanding = await _localFileStanding;
+      _dataFile = await _localDataFile;
       _screenWidth = state.cameraController!.value.previewSize!.height;
       _screenHeight = state.cameraController!.value.previewSize!.width;
     } catch (e) {
@@ -93,20 +83,56 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
     }
   }
 
-  // save face detection result to file
-  Future<void> saveFaceDataWalking() async {
+  // Helper method to convert CircularBuffer to List for storage
+  List<List<double>> _queueToList(CircularBuffer<List<double>> queue) {
+    final result = <List<double>>[];
+    for (var i = 0; i < queue.length; i++) {
+      result.add(queue[i]);
+    }
+    return result;
+  }
+
+  // save face detection result to file with activity type
+  Future<void> saveFaceData(String activityType) async {
     try {
       // Set saving status
-      emit(state.copyWith(statusMessage: 'Saving walking data...'));
+      emit(state.copyWith(statusMessage: 'Saving $activityType data...'));
 
-      await _fileWalking.writeAsString(
-        state.queue.toString(),
-        mode: FileMode.append,
+      // Create session with metadata
+      final session = FaceTrackingSession(
+        timestamp: DateTime.now(),
+        activityType: activityType,
+        sequenceLength: AppConstants.sequenceLength,
+        cameraFps: AppConstants.cameraFps,
+        coordinates: _queueToList(state.queue),
       );
 
-      print('_fileWalking path: ${_fileWalking.path}');
+      // Load existing data
+      List<dynamic> sessions = [];
+      if (await _dataFile.exists()) {
+        try {
+          final content = await _dataFile.readAsString();
+          if (content.isNotEmpty) {
+            sessions = jsonDecode(content);
+          }
+        } catch (e) {
+          print('Error reading existing data: $e');
+          // Continue with empty sessions if file can't be read
+        }
+      }
+
+      // Add new session
+      sessions.add(session.toJson());
+
+      // Write back to file
+      await _dataFile.writeAsString(jsonEncode(sessions));
+
+      print('Data saved to: ${_dataFile.path}');
+
       // Update status message with success
-      emit(state.copyWith(statusMessage: 'Walking data saved successfully!'));
+      emit(
+        state.copyWith(statusMessage: '$activityType data saved successfully!'),
+      );
 
       // Clear status message after a delay
       Future.delayed(
@@ -119,10 +145,10 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
       emit(
         state.copyWith(
           error: e.toString(),
-          statusMessage: 'Error saving walking data',
+          statusMessage: 'Error saving $activityType data',
         ),
       );
-      print('error saving face data: $e');
+      print('Error saving face data: $e');
 
       // Clear error status message after a delay
       Future.delayed(
@@ -134,42 +160,13 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
     }
   }
 
+  // Convenience methods for specific activity types
+  Future<void> saveFaceDataWalking() async {
+    await saveFaceData(AppConstants.activityWalking);
+  }
+
   Future<void> saveFaceDataStanding() async {
-    try {
-      // Set saving status
-      emit(state.copyWith(statusMessage: 'Saving standing data...'));
-
-      await _fileStanding.writeAsString(
-        state.queue.toString(),
-        mode: FileMode.append,
-      );
-
-      // Update status message with success
-      emit(state.copyWith(statusMessage: 'Standing data saved successfully!'));
-
-      // Clear status message after a delay
-      Future.delayed(
-        const Duration(seconds: AppConstants.statusMessageDuration),
-        () {
-          emit(state.copyWith(statusMessage: ''));
-        },
-      );
-    } catch (e) {
-      emit(
-        state.copyWith(
-          error: e.toString(),
-          statusMessage: 'Error saving standing data',
-        ),
-      );
-
-      // Clear error status message after a delay
-      Future.delayed(
-        const Duration(seconds: AppConstants.statusMessageDuration),
-        () {
-          emit(state.copyWith(statusMessage: ''));
-        },
-      );
-    }
+    await saveFaceData(AppConstants.activityStanding);
   }
 
   Future<void> deleteAllFaceData() async {
@@ -177,13 +174,9 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
       // Set deleting status
       emit(state.copyWith(statusMessage: 'Deleting saved data...'));
 
-      // Delete both files if they exist
-      if (await _fileWalking.exists()) {
-        await _fileWalking.delete();
-      }
-
-      if (await _fileStanding.exists()) {
-        await _fileStanding.delete();
+      // Delete data file if it exists
+      if (await _dataFile.exists()) {
+        await _dataFile.delete();
       }
 
       // Update status message with success

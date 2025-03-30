@@ -1,9 +1,8 @@
-// statesless widget that contains bloc provider and home page
-
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../constants/constants.dart';
 import '../cubit/face_detection_cubit.dart';
 import '../device/mlkit_face_camera_repository.dart';
 import '../widgets/dot_painter.dart';
@@ -28,14 +27,62 @@ class FaceTrackingScreen extends StatelessWidget {
   }
 }
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final TextEditingController _customActivityController =
+      TextEditingController();
+
+  @override
+  void dispose() {
+    _customActivityController.dispose();
+    super.dispose();
+  }
+
+  void _showCustomActivityDialog(
+    BuildContext context,
+    FaceDetectionCubit cubit,
+  ) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Save Custom Activity'),
+          content: TextField(
+            controller: _customActivityController,
+            decoration: const InputDecoration(hintText: 'Enter activity name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (_customActivityController.text.isNotEmpty) {
+                  cubit.saveFaceData(_customActivityController.text);
+                  _customActivityController.clear();
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final faceDetectionCubit = context.read<FaceDetectionCubit>();
     final size = MediaQuery.of(context).size;
-    final deviceRatio = size.width / size.height;
+
     return Container(
       alignment: Alignment.topCenter,
       child: BlocBuilder<FaceDetectionCubit, FaceDetectionState>(
@@ -75,7 +122,7 @@ class HomePage extends StatelessWidget {
                       horizontal: 16,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.7),
+                      color: Colors.black.withOpacity(0.7),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -89,6 +136,41 @@ class HomePage extends StatelessWidget {
                     ),
                   ),
                 ),
+
+              // Metadata indicator
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 5,
+                    horizontal: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'FPS: ${AppConstants.cameraFps}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        'Points: ${state.queue.length}/${AppConstants.sequenceLength}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
               // Bottom button panel with safer zone positioning
               Positioned(
@@ -158,6 +240,36 @@ class HomePage extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed:
+                                  () => _showCustomActivityDialog(
+                                    context,
+                                    faceDetectionCubit,
+                                  ),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                backgroundColor: Colors.green.shade700,
+                              ),
+                              child: const Text(
+                                'Custom Activity',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
                           Expanded(
                             child: ElevatedButton(
                               onPressed:
