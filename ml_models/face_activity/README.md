@@ -142,6 +142,15 @@ The model uses a 1D CNN architecture with the following layers:
 9. Dropout layer (0.5)
 10. Output layer (softmax activation)
 
+## Data Augmentation
+
+The model includes data augmentation techniques to improve generalization:
+
+- Time warping (stretching and compressing)
+- Magnitude warping (scaling amplitude)
+- Jittering (adding noise)
+- Permutation (swapping segments)
+
 ## Customization
 
 You can modify the script to:

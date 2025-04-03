@@ -98,6 +98,17 @@ Example of saved data:
 ]
 ```
 
+## Data Storage Location
+
+The data is stored in the device's local storage. The app uses the `path_provider` package to determine the correct directory for saving files. The data files are saved in a directory named `face_tracking_data` within the app's documents directory.
+
+For Android, the path is typically:
+```
+/Android/data/iot.games.flutter_face_tracking_excercise_app/files/face_tracking_data/
+```
+
+Use `path_provier` to get the correct path for iOS and Android.
+
 ## Project Structure
 
 ```
