@@ -22,4 +22,9 @@ class AppConstants {
   // Activity types
   static const String activityWalking = 'walking';
   static const String activityStanding = 'standing';
+
+  // Trained ML Model settings
+  static const String assetsModelFolder = 'assets/models/';
+  static const String modelFilename = 'face_activity_classifier.tflite';
+  static const String classNamesFilename = 'class_names.json';
 }

@@ -5,15 +5,19 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../constants/constants.dart';
 import '../cubit/face_detection_cubit.dart';
 import '../device/mlkit_face_camera_repository.dart';
+import '../services/model_service.dart';
 import '../widgets/dot_painter.dart';
+import '../widgets/model_results_widget.dart';
 
 class FaceTrackingScreen extends StatelessWidget {
   const FaceTrackingScreen({
     super.key,
     required this.mlkitFaceCameraRepository,
+    required this.modelService,
   });
 
   final MLKITFaceCameraRepository mlkitFaceCameraRepository;
+  final ModelService modelService;
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +25,7 @@ class FaceTrackingScreen extends StatelessWidget {
       create:
           (context) => FaceDetectionCubit(
             mlkitFaceCameraRepository: mlkitFaceCameraRepository,
+            modelService: modelService,
           ),
       child: const HomePage(),
     );
@@ -137,6 +142,22 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
 
+              // Model prediction results - positioned at the top
+              if (state.modelAvailable)
+                Positioned(
+                  top: state.statusMessage.isNotEmpty ? 120 : 50,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: ModelResultsWidget(
+                      modelAvailable: state.modelAvailable,
+                      modelLoaded: state.modelLoaded,
+                      currentActivity: state.currentActivity,
+                      confidenceScore: state.confidenceScore,
+                    ),
+                  ),
+                ),
+
               // Metadata indicator
               Positioned(
                 top: 10,
@@ -167,6 +188,15 @@ class _HomePageState extends State<HomePage> {
                           fontSize: 12,
                         ),
                       ),
+                      if (state.modelLoaded)
+                        Text(
+                          'Model: Active',
+                          style: const TextStyle(
+                            color: Colors.green,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                     ],
                   ),
                 ),

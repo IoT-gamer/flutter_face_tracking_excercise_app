@@ -8,6 +8,11 @@ class FaceDetectionState extends Equatable {
   final CircularBuffer<List<double>> queue;
   final String error;
   final String statusMessage;
+  // Added model-related fields
+  final bool modelAvailable;
+  final bool modelLoaded;
+  final String currentActivity;
+  final double confidenceScore;
 
   const FaceDetectionState({
     this.cameraController,
@@ -17,6 +22,10 @@ class FaceDetectionState extends Equatable {
     required this.queue,
     required this.error,
     required this.statusMessage,
+    required this.modelAvailable,
+    required this.modelLoaded,
+    required this.currentActivity,
+    required this.confidenceScore,
   });
 
   factory FaceDetectionState.initial() {
@@ -28,11 +37,25 @@ class FaceDetectionState extends Equatable {
       queue: CircularBuffer<List<double>>(100),
       error: "",
       statusMessage: "",
+      modelAvailable: false,
+      modelLoaded: false,
+      currentActivity: "Unknown",
+      confidenceScore: 0.0,
     );
   }
 
   @override
-  List<Object> get props => [centerX, centerY, queue, error, statusMessage];
+  List<Object> get props => [
+    centerX,
+    centerY,
+    queue,
+    error,
+    statusMessage,
+    modelAvailable,
+    modelLoaded,
+    currentActivity,
+    confidenceScore,
+  ];
 
   @override
   bool get stringify => true;
@@ -45,6 +68,10 @@ class FaceDetectionState extends Equatable {
     CircularBuffer<List<double>>? queue,
     String? error,
     String? statusMessage,
+    bool? modelAvailable,
+    bool? modelLoaded,
+    String? currentActivity,
+    double? confidenceScore,
   }) {
     return FaceDetectionState(
       cameraController: cameraController ?? this.cameraController,
@@ -54,6 +81,10 @@ class FaceDetectionState extends Equatable {
       queue: queue ?? this.queue,
       error: error ?? this.error,
       statusMessage: statusMessage ?? this.statusMessage,
+      modelAvailable: modelAvailable ?? this.modelAvailable,
+      modelLoaded: modelLoaded ?? this.modelLoaded,
+      currentActivity: currentActivity ?? this.currentActivity,
+      confidenceScore: confidenceScore ?? this.confidenceScore,
     );
   }
 }

@@ -164,7 +164,7 @@ class MLKITFaceCameraRepository {
     final rootIsolateToken = inputMessage['token'];
     //final inputImage = _inputImageFromCameraImage(image);
     BackgroundIsolateBinaryMessenger.ensureInitialized(rootIsolateToken);
-    print('start face detection function');
+    // print('start face detection function');
     if (inputImage != null) {
       final faces = await _faceDetector.processImage(inputImage);
       final largestFace = _getLargestFace(faces);

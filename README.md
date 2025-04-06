@@ -1,18 +1,19 @@
-# Flutter Face Tracking Excercise App
+# Flutter Face Tracking Exercise App
 
-A Flutter application for collecting face movement data to train machine learning models for exercise activity detection. This app tracks a user's face position during different activities and saves the data for training ML models that can detect whether a person is walking or standing.
+A Flutter application for collecting face movement data to train machine learning models for exercise activity detection. This app tracks a user's face position during different activities, saves the data for training ML models, and can display real-time predictions using a trained model.
 
 ## Overview
 
 This app uses the device's front camera and Google's ML Kit to track facial movements. It records the coordinates of the face during different activities (walking, standing, or custom activities) and saves this data for later use in training machine learning models.
 
-The primary use case is positioning a phone or tablet on a stationary part of an exercise machine (like a treadmill or elliptical trainer) to track the user's face movements while exercising. This data can then be used to train ML models to detect exercise activities based solely on facial movement patterns.
+The primary use case is positioning a phone or tablet on a stationary part of an exercise machine (like a treadmill or elliptical trainer) to track the user's face movements while exercising. This data can then be used to train ML models to detect exercise activities based solely on facial movement patterns. Once trained, the model can be integrated back into the app for real-time activity detection.
 
 ## Features
 
 - Real-time face detection and tracking
 - Recording of face position coordinates
 - Storage of activity data with proper labeling
+- Real-time activity prediction using a trained model
 - Support for multiple activity types:
   - Walking
   - Standing
@@ -38,6 +39,8 @@ The primary use case is positioning a phone or tablet on a stationary part of an
 - circular_buffer: For storing sequences of coordinates
 - integral_isolates: For background processing
 - wakelock_plus: To keep screen on during tracking
+- tflite_flutter: For running trained ML models
+- flutter_archive: For handling model files
 
 ## Installation
 
@@ -59,6 +62,8 @@ flutter run
 
 ## Usage
 
+### Data Collection Mode
+
 1. Launch the app and grant camera permissions
 2. Position your device on a stable surface with the front camera facing you
 3. Tap "Start Detection" to begin face tracking
@@ -66,6 +71,15 @@ flutter run
 5. Tap the appropriate button to save the data with the correct activity label
 6. Collect multiple samples for better ML training results
 7. Use the "Delete Data" button to clear all saved data if needed
+
+### Model Prediction Mode
+
+If you have a trained model:
+
+1. Place the TensorFlow Lite model file (`face_activity_classifier.tflite`) and class names file (`class_names.json`) in the `assets/models/` directory
+2. Launch the app and tap "Start Detection"
+3. The app will automatically load the model and display real-time predictions of your activity
+4. The prediction includes the activity type and a confidence score
 
 ## Data Format
 
@@ -100,14 +114,14 @@ Example of saved data:
 
 ## Data Storage Location
 
-The data is stored in the device's local storage. The app uses the `path_provider` package to determine the correct directory for saving files. The data files are saved in a directory named `face_tracking_data` within the app's documents directory.
+The data is stored in the device's local storage. The app uses the `path_provider` package to determine the correct directory for saving files.
 
 For Android, the path is typically:
 ```
 /Android/data/iot.games.flutter_face_tracking_excercise_app/files/face_tracking_data/
 ```
 
-Use `path_provier` to get the correct path for iOS and Android.
+Use `path_provider` to get the correct path for iOS and Android.
 
 ## Project Structure
 
@@ -124,14 +138,33 @@ lib/
 │   └── face_tracking_session.dart   # Data model for tracking sessions
 ├── screens/
 │   └── face_tracking_screen.dart    # Main UI screen
+├── services/
+│   └── model_service.dart     # TensorFlow Lite model handling
 ├── widgets/
-│   └── dot_painter.dart     # Visual indicator for face tracking
+│   ├── dot_painter.dart       # Visual indicator for face tracking
+│   └── model_results_widget.dart  # Display for model predictions
 └── main.dart                # Application entry point
 ```
 
 ## Machine Learning Integration
 
+### Training a Model
+
 The data collected with this app is designed to be used with the Face Activity Classifier ML model located in the `ml_models/face_activity/` directory. See the [ML model README](ml_models/face_activity/README.md) for details on how to train a model with the collected data.
+
+### Using a Trained Model
+
+After training the model:
+
+1. Copy the generated TensorFlow Lite model (`face_activity_classifier.tflite`) to the `assets/models/` directory
+2. Copy the class names file (`class_names.json`) to the `assets/models/` directory
+3. Ensure these assets are included in your `pubspec.yaml`:
+   ```yaml
+   flutter:
+     assets:
+       - assets/models/
+   ```
+4. Run the app and enjoy real-time activity predictions!
 
 ## Customization
 
@@ -143,6 +176,9 @@ You can modify various parameters in `constants/constants.dart`:
 - `cameraFps`: Camera frame rate for tracking
 - `dotRadius`: Size of the tracking dot
 - `smilingThreshold`: Threshold for smile detection (not currently used for classification)
+- `assetsModelFolder`: Folder where the model files are stored
+- `modelFilename`: Name of the TensorFlow Lite model file
+- `classNamesFilename`: Name of the class names file
 
 ### Adding New Activity Types
 
@@ -151,6 +187,7 @@ To add predefined activity types:
 1. Add constants in `constants/constants.dart`
 2. Add convenience methods in `face_detection_cubit.dart`
 3. Add buttons in `face_tracking_screen.dart`
+4. Update the machine learning model to recognize the new activities
 
 ## Troubleshooting
 
@@ -158,6 +195,8 @@ To add predefined activity types:
 - **Face not detected**: Ensure adequate lighting and position your face within camera view
 - **App crashing**: Check logs for ML Kit or camera-related errors
 - **Data not saving**: Verify storage permissions are granted
+- **Model not loading**: Ensure model files are in the correct location and pubspec.yaml is properly configured
+- **Poor predictions**: Collect more training data or adjust the model architecture in the Python script
 
 ## Contributing
 
@@ -170,4 +209,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 - Google ML Kit for face detection capabilities
+- TensorFlow Lite for on-device machine learning inferencing
 - Flutter team for the excellent framework

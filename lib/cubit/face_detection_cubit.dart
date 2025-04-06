@@ -11,37 +11,133 @@ import 'package:path_provider/path_provider.dart';
 import '../constants/constants.dart';
 import '../device/mlkit_face_camera_repository.dart';
 import '../models/face_tracking_session.dart';
+import '../services/model_service.dart';
 
 part 'face_detection_state.dart';
 
 class FaceDetectionCubit extends Cubit<FaceDetectionState> {
-  FaceDetectionCubit({required mlkitFaceCameraRepository})
-    : _mlkitFaceCameraRepository = mlkitFaceCameraRepository,
-      super(FaceDetectionState.initial());
+  FaceDetectionCubit({
+    required mlkitFaceCameraRepository,
+    required ModelService modelService,
+  }) : _mlkitFaceCameraRepository = mlkitFaceCameraRepository,
+       _modelService = modelService,
+       super(FaceDetectionState.initial());
 
   final MLKITFaceCameraRepository _mlkitFaceCameraRepository;
+  final ModelService _modelService;
 
   StreamSubscription? _faceDetectionStreamSubscription;
   CameraController? _cameraController;
   late File _dataFile;
   late double _screenWidth;
   late double _screenHeight;
+  Timer? _predictionTimer;
   static const String _faceDataFilename = AppConstants.faceDataFilename;
 
-  //get path for saving face detection result
+  // Get path for saving face detection result
   Future<String?> get _localPath async {
     final directory = await getExternalStorageDirectory();
     print('directory path: ${directory?.path}');
     return directory?.path;
   }
 
-  // get unified data file for saving face detection results
+  // Get unified data file for saving face detection results
   Future<File> get _localDataFile async {
     final path = await _localPath;
     return File('$path/$_faceDataFilename');
   }
 
-  // create isolate for face detection
+  // Check if model is available and load it
+  Future<void> checkModelAvailability() async {
+    try {
+      final isAvailable = await _modelService.areModelsInAssets();
+      emit(state.copyWith(modelAvailable: isAvailable));
+
+      if (isAvailable) {
+        final isLoaded = await _modelService.initialize();
+        emit(
+          state.copyWith(
+            modelLoaded: isLoaded,
+            statusMessage:
+                isLoaded ? 'Model loaded successfully' : 'Failed to load model',
+          ),
+        );
+
+        // Clear status message after a delay
+        if (isLoaded) {
+          Future.delayed(
+            const Duration(seconds: AppConstants.statusMessageDuration),
+            () {
+              emit(state.copyWith(statusMessage: ''));
+            },
+          );
+        }
+      }
+    } catch (e) {
+      emit(
+        state.copyWith(
+          error: 'Error checking model availability: ${e.toString()}',
+          modelAvailable: false,
+          modelLoaded: false,
+        ),
+      );
+    }
+  }
+
+  // Helper method to get a List from CircularBuffer for prediction
+  List<List<double>> _queueToList(CircularBuffer<List<double>> queue) {
+    final result = <List<double>>[];
+    for (var i = 0; i < queue.length; i++) {
+      result.add(queue[i]);
+    }
+    return result;
+  }
+
+  // Start periodic predictions if model is loaded
+  void startPeriodicPredictions() {
+    if (state.modelLoaded && _predictionTimer == null) {
+      // Make predictions every 1 second
+      _predictionTimer = Timer.periodic(
+        const Duration(milliseconds: 500),
+        (_) => _makePrediction(),
+      );
+    }
+  }
+
+  // Stop periodic predictions
+  void stopPeriodicPredictions() {
+    _predictionTimer?.cancel();
+    _predictionTimer = null;
+  }
+
+  // Make a prediction using the loaded model
+  Future<void> _makePrediction() async {
+    if (!state.modelLoaded || state.queue.isEmpty) return;
+
+    try {
+      // Get coordinates from the queue
+      final coordinates = _queueToList(state.queue);
+
+      // Need at least a few points for a meaningful prediction
+      if (coordinates.length < 10) return;
+
+      // Run inference
+      final prediction = await _modelService.runInference(coordinates);
+
+      // Update state with prediction results
+      emit(
+        state.copyWith(
+          currentActivity: prediction['class'],
+          confidenceScore: prediction['confidence'],
+        ),
+      );
+    } catch (e) {
+      print('Error making prediction: $e');
+      // Don't update the state with error to avoid UI flicker
+    }
+  }
+
+  // Create isolate for face detection
   Future<void> createIsolate() async {
     try {
       await _mlkitFaceCameraRepository.createIsolate();
@@ -50,7 +146,7 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
     }
   }
 
-  // get camera
+  // Get camera
   Future<void> getCamera() async {
     try {
       await _mlkitFaceCameraRepository.getCamera();
@@ -59,7 +155,7 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
     }
   }
 
-  // initialize camera
+  // Initialize camera
   Future<void> initializeCamera() async {
     try {
       _cameraController = await _mlkitFaceCameraRepository.initializeCamera();
@@ -69,7 +165,7 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
     }
   }
 
-  // set up face detection
+  // Set up face detection
   Future<void> setUpFaceDetection() async {
     try {
       await getCamera();
@@ -78,21 +174,15 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
       _dataFile = await _localDataFile;
       _screenWidth = state.cameraController!.value.previewSize!.height;
       _screenHeight = state.cameraController!.value.previewSize!.width;
+
+      // Check model availability after setting up face detection
+      await checkModelAvailability();
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }
   }
 
-  // Helper method to convert CircularBuffer to List for storage
-  List<List<double>> _queueToList(CircularBuffer<List<double>> queue) {
-    final result = <List<double>>[];
-    for (var i = 0; i < queue.length; i++) {
-      result.add(queue[i]);
-    }
-    return result;
-  }
-
-  // save face detection result to file with activity type
+  // Save face detection result to file with activity type
   Future<void> saveFaceData(String activityType) async {
     try {
       // Set saving status
@@ -221,7 +311,7 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
             final smileProb = face['smilingProbability'];
             final centerX = face['center']['x'];
             final centerY = face['center']['y'];
-            print('coordinates: $centerX, $centerY');
+            // print('coordinates: $centerX, $centerY');
             emit(
               state.copyWith(
                 isSmiling: smileProb > AppConstants.smilingThreshold,
@@ -233,6 +323,11 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
               ),
             );
           });
+
+      // Start periodic predictions if model is loaded
+      if (state.modelLoaded) {
+        startPeriodicPredictions();
+      }
     } catch (e) {
       print('error subscribing to face detection');
       print(e);
@@ -240,18 +335,19 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
     }
   }
 
-  // unsubscribe from faceDetectionStream
+  // Unsubscribe from faceDetectionStream
   Future<void> unsubscribeFromFaceDetection() async {
     try {
       await _faceDetectionStreamSubscription?.cancel();
       _faceDetectionStreamSubscription = null;
+      stopPeriodicPredictions();
       stopCameraImageStream();
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }
   }
 
-  // stop camera image stream
+  // Stop camera image stream
   Future<void> stopCameraImageStream() async {
     try {
       _mlkitFaceCameraRepository.stopImageStream();
@@ -260,7 +356,7 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
     }
   }
 
-  // dispose stateful isolate
+  // Dispose stateful isolate
   Future<void> disposeStatefulIsolate() async {
     try {
       _mlkitFaceCameraRepository.statefulIsolateDispose();
@@ -269,10 +365,12 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
     }
   }
 
-  // clean up
+  // Clean up
   void cleanUp() {
     print('cleaning up');
+    stopPeriodicPredictions();
     stopCameraImageStream();
     disposeStatefulIsolate();
+    _modelService.dispose();
   }
 }
