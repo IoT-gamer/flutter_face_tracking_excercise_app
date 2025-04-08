@@ -142,7 +142,9 @@ lib/
 │   └── model_service.dart     # TensorFlow Lite model handling
 ├── widgets/
 │   ├── dot_painter.dart       # Visual indicator for face tracking
-│   └── model_results_widget.dart  # Display for model predictions
+│   ├── metadata_indicator_widget.dart  # Display for FPS and points info
+│   ├── model_results_widget.dart  # Display for model predictions
+│   └── status_message_widget.dart  # Display for status messages
 └── main.dart                # Application entry point
 ```
 
