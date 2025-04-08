@@ -24,7 +24,9 @@ class ModelResultsWidget extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.7),
+        color: Colors.black.withAlpha(
+          179,
+        ), // 0.7 opacity converted to alpha value
         borderRadius: BorderRadius.circular(8),
       ),
       child:
@@ -38,6 +40,7 @@ class ModelResultsWidget extends StatelessWidget {
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -50,6 +53,7 @@ class ModelResultsWidget extends StatelessWidget {
                               : Colors.yellow[300],
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -70,7 +74,11 @@ class ModelResultsWidget extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     'Confidence: ${(confidenceScore * 100).toStringAsFixed(1)}%',
-                    style: TextStyle(color: Colors.grey[300], fontSize: 14),
+                    style: TextStyle(
+                      color: Colors.grey[300],
+                      fontSize: 14,
+                      decoration: TextDecoration.none,
+                    ),
                   ),
                 ],
               )
@@ -79,9 +87,15 @@ class ModelResultsWidget extends StatelessWidget {
                 children: [
                   CircularProgressIndicator(color: Colors.white),
                   SizedBox(width: 16),
-                  Text(
-                    'Loading model...',
-                    style: TextStyle(color: Colors.white),
+                  Flexible(
+                    child: Text(
+                      'Loading model...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        decoration: TextDecoration.none,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),

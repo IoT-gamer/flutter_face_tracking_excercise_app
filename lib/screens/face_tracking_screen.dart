@@ -7,7 +7,9 @@ import '../cubit/face_detection_cubit.dart';
 import '../device/mlkit_face_camera_repository.dart';
 import '../services/model_service.dart';
 import '../widgets/dot_painter.dart';
+import '../widgets/metadata_indicator_widget.dart';
 import '../widgets/model_results_widget.dart';
+import '../widgets/status_message_widget.dart';
 
 class FaceTrackingScreen extends StatelessWidget {
   const FaceTrackingScreen({
@@ -120,26 +122,7 @@ class _HomePageState extends State<HomePage> {
                   top: 50,
                   left: 0,
                   right: 0,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 10,
-                      horizontal: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      state.statusMessage,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
+                  child: StatusMessageWidget(message: state.statusMessage),
                 ),
 
               // Model prediction results - positioned at the top
@@ -162,43 +145,11 @@ class _HomePageState extends State<HomePage> {
               Positioned(
                 top: 10,
                 right: 10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 5,
-                    horizontal: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'FPS: ${AppConstants.cameraFps}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
-                      ),
-                      Text(
-                        'Points: ${state.queue.length}/${AppConstants.sequenceLength}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
-                      ),
-                      if (state.modelLoaded)
-                        Text(
-                          'Model: Active',
-                          style: const TextStyle(
-                            color: Colors.green,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                    ],
-                  ),
+                child: MetadataIndicatorWidget(
+                  fps: AppConstants.cameraFps,
+                  queueLength: state.queue.length,
+                  maxQueueLength: AppConstants.sequenceLength,
+                  modelLoaded: state.modelLoaded,
                 ),
               ),
 
