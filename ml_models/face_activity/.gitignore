@@ -2,3 +2,4 @@ venv/
 __pycache__/
 face_tracking_data.json
 trained_models/
+face_tracking_plots/
