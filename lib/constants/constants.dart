@@ -9,6 +9,10 @@ class AppConstants {
   static const int sequenceLength =
       100; // Number of data points to save at once
 
+  // Outlier detection settings
+  static const double madOutlierThreshold =
+      3.0; // Number of MADs beyond which a point is considered an outlier
+
   // Camera settings
   static const bool enableAudio = false; // Disable audio for the camera
   static const int cameraFps =

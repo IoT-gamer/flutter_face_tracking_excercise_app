@@ -11,6 +11,7 @@ The primary use case is positioning a phone or tablet on a stationary part of an
 ## Features
 
 - Real-time face detection and tracking
+- Advanced outlier detection and filtering using Median Absolute Deviation (MAD)
 - Recording of face position coordinates
 - Storage of activity data with proper labeling
 - Real-time activity prediction using a trained model
@@ -19,6 +20,7 @@ The primary use case is positioning a phone or tablet on a stationary part of an
   - Standing
   - Custom activities (user-defined)
 - Visual feedback with face tracking dot
+- Interactive outlier visualization
 - Status messages for operation feedback
 - Data management (save/delete functionality)
 
@@ -71,6 +73,7 @@ flutter run
 5. Tap the appropriate button to save the data with the correct activity label
 6. Collect multiple samples for better ML training results
 7. Use the "Delete Data" button to clear all saved data if needed
+8. Toggle "Outlier Viz" to view outlier detection visualization
 
 ### Model Prediction Mode
 
@@ -89,7 +92,7 @@ The app collects face tracking data and saves it in JSON format. Each tracking s
 - Activity type (walking, standing, or custom)
 - Sequence length (number of coordinate points)
 - Camera FPS (frames per second)
-- Normalized coordinates (x,y) of the face center
+- Normalized coordinates (x,y) of the face center, with outliers filtered via MAD algorithm
 
 Example of saved data:
 
@@ -111,6 +114,19 @@ Example of saved data:
   }
 ]
 ```
+
+## Data Processing
+
+### Outlier Detection
+
+The app implements the Median Absolute Deviation (MAD) algorithm to detect and handle outliers in face tracking data:
+
+- **Algorithm**: Identifies coordinate points that deviate significantly from the median
+- **Handling**: Instead of removing outliers (which would disrupt the sequence length needed for the model), the system replaces them with interpolated values
+- **Visualization**: The app provides an interactive visualization showing original points (gray), detected outliers (red), and their adjusted values (green)
+- **Statistics**: Tracks and displays outlier percentages for both current frame and session-wide metrics
+
+This outlier filtering improves model prediction accuracy and ensures higher quality training data by smoothing out erratic movements or tracking errors.
 
 ## Data Storage Location
 
@@ -140,10 +156,13 @@ lib/
 │   └── face_tracking_screen.dart    # Main UI screen
 ├── services/
 │   └── model_service.dart     # TensorFlow Lite model handling
+├── utils/
+│   └── outlier_detection_utils.dart # MAD outlier detection algorithm
 ├── widgets/
 │   ├── dot_painter.dart       # Visual indicator for face tracking
 │   ├── metadata_indicator_widget.dart  # Display for FPS and points info
 │   ├── model_results_widget.dart  # Display for model predictions
+│   ├── outlier_visualization_widget.dart # Visualization for outlier detection
 │   └── status_message_widget.dart  # Display for status messages
 └── main.dart                # Application entry point
 ```
@@ -178,6 +197,7 @@ You can modify various parameters in `constants/constants.dart`:
 - `cameraFps`: Camera frame rate for tracking
 - `dotRadius`: Size of the tracking dot
 - `smilingThreshold`: Threshold for smile detection (not currently used for classification)
+- `madOutlierThreshold`: Sensitivity of the MAD outlier detection (lower values = more aggressive filtering)
 - `assetsModelFolder`: Folder where the model files are stored
 - `modelFilename`: Name of the TensorFlow Lite model file
 - `classNamesFilename`: Name of the class names file
@@ -199,6 +219,7 @@ To add predefined activity types:
 - **Data not saving**: Verify storage permissions are granted
 - **Model not loading**: Ensure model files are in the correct location and pubspec.yaml is properly configured
 - **Poor predictions**: Collect more training data or adjust the model architecture in the Python script
+- **Low outlier detection**: Adjust the `madOutlierThreshold` constant (lower values increase sensitivity)
 
 ## Contributing
 

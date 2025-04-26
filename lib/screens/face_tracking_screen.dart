@@ -9,6 +9,7 @@ import '../services/model_service.dart';
 import '../widgets/dot_painter.dart';
 import '../widgets/metadata_indicator_widget.dart';
 import '../widgets/model_results_widget.dart';
+import '../widgets/outlier_visualization_widget.dart';
 import '../widgets/status_message_widget.dart';
 
 class FaceTrackingScreen extends StatelessWidget {
@@ -132,24 +133,93 @@ class _HomePageState extends State<HomePage> {
                   left: 0,
                   right: 0,
                   child: Center(
-                    child: ModelResultsWidget(
-                      modelAvailable: state.modelAvailable,
-                      modelLoaded: state.modelLoaded,
-                      currentActivity: state.currentActivity,
-                      confidenceScore: state.confidenceScore,
+                    child: Column(
+                      children: [
+                        ModelResultsWidget(
+                          modelAvailable: state.modelAvailable,
+                          modelLoaded: state.modelLoaded,
+                          currentActivity: state.currentActivity,
+                          confidenceScore: state.confidenceScore,
+                        ),
+                        // Add the outlier visualization if enabled with all state statistics
+                        if (state.showOutlierVisualization &&
+                            state.filteredCoordinates.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: OutlierVisualizationWidget(
+                              originalCoordinates: state.originalCoordinates,
+                              filteredCoordinates: state.filteredCoordinates,
+                              adjustedPoints: state.adjustedPoints,
+                              totalPoints: state.totalPoints,
+                              totalOutliersDetected:
+                                  state.totalOutliersDetected,
+                              currentOutliers: state.currentOutliers,
+                              outlierPercentage: state.outlierPercentage,
+                              showVisualization: state.showOutlierVisualization,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
 
-              // Metadata indicator
+              // Metadata indicator with outlier stats
               Positioned(
                 top: 10,
                 right: 10,
-                child: MetadataIndicatorWidget(
-                  fps: AppConstants.cameraFps,
-                  queueLength: state.queue.length,
-                  maxQueueLength: AppConstants.sequenceLength,
-                  modelLoaded: state.modelLoaded,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    MetadataIndicatorWidget(
+                      fps: AppConstants.cameraFps,
+                      queueLength: state.queue.length,
+                      maxQueueLength: AppConstants.sequenceLength,
+                      modelLoaded: state.modelLoaded,
+                    ),
+                    if (state.modelLoaded)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: GestureDetector(
+                          onTap: () {
+                            faceDetectionCubit.toggleOutlierVisualization();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 5,
+                              horizontal: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  state.showOutlierVisualization
+                                      ? Colors.green.withOpacity(0.7)
+                                      : Colors.black.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  state.showOutlierVisualization
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Outlier Viz (${state.outlierPercentage.toStringAsFixed(1)}%)',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
 
@@ -259,10 +329,7 @@ class _HomePageState extends State<HomePage> {
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 12,
                                 ),
-                                backgroundColor:
-                                    Colors
-                                        .red
-                                        .shade700, // Red color for delete button
+                                backgroundColor: Colors.red.shade700,
                               ),
                               child: const Text(
                                 'Delete Data',

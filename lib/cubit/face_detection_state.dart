@@ -8,11 +8,21 @@ class FaceDetectionState extends Equatable {
   final CircularBuffer<List<double>> queue;
   final String error;
   final String statusMessage;
-  // Added model-related fields
+  // Model-related fields
   final bool modelAvailable;
   final bool modelLoaded;
   final String currentActivity;
   final double confidenceScore;
+  // Outlier detection fields
+  final List<List<double>> originalCoordinates;
+  final List<List<double>> filteredCoordinates;
+  final List<bool> adjustedPoints;
+  // Outlier statistics
+  final int totalPoints; // Total points processed
+  final int totalOutliersDetected; // Total outliers detected
+  final int currentOutliers; // Outliers in current frame
+  final double outlierPercentage; // Overall percentage of outliers
+  final bool showOutlierVisualization;
 
   const FaceDetectionState({
     this.cameraController,
@@ -26,6 +36,14 @@ class FaceDetectionState extends Equatable {
     required this.modelLoaded,
     required this.currentActivity,
     required this.confidenceScore,
+    required this.originalCoordinates,
+    required this.filteredCoordinates,
+    required this.adjustedPoints,
+    required this.totalPoints,
+    required this.totalOutliersDetected,
+    required this.currentOutliers,
+    required this.outlierPercentage,
+    required this.showOutlierVisualization,
   });
 
   factory FaceDetectionState.initial() {
@@ -34,18 +52,28 @@ class FaceDetectionState extends Equatable {
       isSmiling: false,
       centerX: -9999,
       centerY: -9999,
-      queue: CircularBuffer<List<double>>(100),
+      queue: CircularBuffer<List<double>>(AppConstants.sequenceLength),
       error: "",
       statusMessage: "",
       modelAvailable: false,
       modelLoaded: false,
       currentActivity: "Unknown",
       confidenceScore: 0.0,
+      originalCoordinates: const [],
+      filteredCoordinates: const [],
+      adjustedPoints: const [],
+      totalPoints: 0,
+      totalOutliersDetected: 0,
+      currentOutliers: 0,
+      outlierPercentage: 0.0,
+      showOutlierVisualization: false,
     );
   }
 
   @override
-  List<Object> get props => [
+  List<Object?> get props => [
+    cameraController,
+    isSmiling,
     centerX,
     centerY,
     queue,
@@ -55,6 +83,14 @@ class FaceDetectionState extends Equatable {
     modelLoaded,
     currentActivity,
     confidenceScore,
+    originalCoordinates,
+    filteredCoordinates,
+    adjustedPoints,
+    totalPoints,
+    totalOutliersDetected,
+    currentOutliers,
+    outlierPercentage,
+    showOutlierVisualization,
   ];
 
   @override
@@ -72,6 +108,14 @@ class FaceDetectionState extends Equatable {
     bool? modelLoaded,
     String? currentActivity,
     double? confidenceScore,
+    List<List<double>>? originalCoordinates,
+    List<List<double>>? filteredCoordinates,
+    List<bool>? adjustedPoints,
+    int? totalPoints,
+    int? totalOutliersDetected,
+    int? currentOutliers,
+    double? outlierPercentage,
+    bool? showOutlierVisualization,
   }) {
     return FaceDetectionState(
       cameraController: cameraController ?? this.cameraController,
@@ -85,6 +129,16 @@ class FaceDetectionState extends Equatable {
       modelLoaded: modelLoaded ?? this.modelLoaded,
       currentActivity: currentActivity ?? this.currentActivity,
       confidenceScore: confidenceScore ?? this.confidenceScore,
+      originalCoordinates: originalCoordinates ?? this.originalCoordinates,
+      filteredCoordinates: filteredCoordinates ?? this.filteredCoordinates,
+      adjustedPoints: adjustedPoints ?? this.adjustedPoints,
+      totalPoints: totalPoints ?? this.totalPoints,
+      totalOutliersDetected:
+          totalOutliersDetected ?? this.totalOutliersDetected,
+      currentOutliers: currentOutliers ?? this.currentOutliers,
+      outlierPercentage: outlierPercentage ?? this.outlierPercentage,
+      showOutlierVisualization:
+          showOutlierVisualization ?? this.showOutlierVisualization,
     );
   }
 }

@@ -12,12 +12,13 @@ import '../constants/constants.dart';
 import '../device/mlkit_face_camera_repository.dart';
 import '../models/face_tracking_session.dart';
 import '../services/model_service.dart';
+import '../utils/outlier_detection_utils.dart';
 
 part 'face_detection_state.dart';
 
 class FaceDetectionCubit extends Cubit<FaceDetectionState> {
   FaceDetectionCubit({
-    required mlkitFaceCameraRepository,
+    required MLKITFaceCameraRepository mlkitFaceCameraRepository,
     required ModelService modelService,
   }) : _mlkitFaceCameraRepository = mlkitFaceCameraRepository,
        _modelService = modelService,
@@ -88,7 +89,7 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
   List<List<double>> _queueToList(CircularBuffer<List<double>> queue) {
     final result = <List<double>>[];
     for (var i = 0; i < queue.length; i++) {
-      result.add(queue[i]);
+      result.add(List.from(queue[i])); // Create a deep copy
     }
     return result;
   }
@@ -96,7 +97,7 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
   // Start periodic predictions if model is loaded
   void startPeriodicPredictions() {
     if (state.modelLoaded && _predictionTimer == null) {
-      // Make predictions every 1 second
+      // Make predictions every 0.5 seconds
       _predictionTimer = Timer.periodic(
         const Duration(milliseconds: 500),
         (_) => _makePrediction(),
@@ -110,25 +111,117 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
     _predictionTimer = null;
   }
 
+  // Compare original and filtered coordinates to find outliers with debugging
+  List<bool> _findAdjustedPoints(
+    List<List<double>> original,
+    List<List<double>> filtered,
+  ) {
+    List<bool> adjustedPoints = List.filled(original.length, false);
+
+    if (original.isEmpty || filtered.isEmpty) {
+      return adjustedPoints;
+    }
+
+    // Use a small epsilon for floating point comparison
+    const double epsilon = 0.0001;
+    int outlierCount = 0;
+
+    // Consider a point adjusted if either x or y coordinate changed by more than epsilon
+    for (int i = 0; i < original.length && i < filtered.length; i++) {
+      double xDiff = (original[i][0] - filtered[i][0]).abs();
+      double yDiff = (original[i][1] - filtered[i][1]).abs();
+
+      // If the difference in either coordinate is significant, mark as adjusted
+      adjustedPoints[i] = xDiff > epsilon || yDiff > epsilon;
+
+      // Debug output to verify detection
+      if (adjustedPoints[i]) {
+        outlierCount++;
+        print(
+          'Outlier at index $i: Original: ${original[i]}, Filtered: ${filtered[i]}',
+        );
+        print('Differences: X: $xDiff, Y: $yDiff');
+      }
+    }
+
+    print('Total adjusted points: $outlierCount out of ${original.length}');
+
+    return adjustedPoints;
+  }
+
+  // Reset outlier statistics
+  void resetOutlierStats() {
+    emit(
+      state.copyWith(
+        totalPoints: 0,
+        totalOutliersDetected: 0,
+        currentOutliers: 0,
+        outlierPercentage: 0.0,
+      ),
+    );
+  }
+
   // Make a prediction using the loaded model
   Future<void> _makePrediction() async {
     if (!state.modelLoaded || state.queue.isEmpty) return;
 
     try {
-      // Get coordinates from the queue
-      final coordinates = _queueToList(state.queue);
+      // Get coordinates from the queue - make deep copies to avoid reference issues
+      final originalCoordinates = _queueToList(state.queue);
 
       // Need at least a few points for a meaningful prediction
-      if (coordinates.length < 10) return;
+      if (originalCoordinates.length < 10) return;
 
-      // Run inference
-      final prediction = await _modelService.runInference(coordinates);
+      // Create a copy of the original coordinates for processing
+      List<List<double>> filteredCoordinates = [];
+      for (var point in originalCoordinates) {
+        filteredCoordinates.add(List.from(point));
+      }
 
-      // Update state with prediction results
+      // Filter outliers using Median Absolute Deviation
+      filteredCoordinates = OutlierDetectionUtils.filterOutliersMAD(
+        filteredCoordinates,
+        threshold: AppConstants.madOutlierThreshold,
+      );
+
+      // Find which points were adjusted
+      List<bool> adjustedPoints = _findAdjustedPoints(
+        originalCoordinates,
+        filteredCoordinates,
+      );
+
+      // Calculate outlier statistics using state
+      int currentOutliers = adjustedPoints.where((adjusted) => adjusted).length;
+      int newTotalPoints = state.totalPoints + originalCoordinates.length;
+      int newTotalOutliers = state.totalOutliersDetected + currentOutliers;
+      double newOutlierPercentage =
+          newTotalPoints > 0 ? (newTotalOutliers / newTotalPoints * 100) : 0.0;
+
+      // Log outlier information
+      if (currentOutliers > 0) {
+        print(
+          'Outliers in current frame: $currentOutliers out of ${originalCoordinates.length}',
+        );
+        print(
+          'Total outliers so far: $newTotalOutliers out of $newTotalPoints (${newOutlierPercentage.toStringAsFixed(2)}%)',
+        );
+      }
+
+      // Run inference with filtered coordinates
+      final prediction = await _modelService.runInference(filteredCoordinates);
+
+      // Update state with prediction results and outlier data
       emit(
         state.copyWith(
           currentActivity: prediction['class'],
           confidenceScore: prediction['confidence'],
+          originalCoordinates: originalCoordinates,
+          filteredCoordinates: filteredCoordinates,
+          adjustedPoints: adjustedPoints,
+          currentOutliers: currentOutliers,
+          totalPoints: newTotalPoints,
+          totalOutliersDetected: newTotalOutliers,
+          outlierPercentage: newOutlierPercentage,
         ),
       );
     } catch (e) {
@@ -175,6 +268,9 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
       _screenWidth = state.cameraController!.value.previewSize!.height;
       _screenHeight = state.cameraController!.value.previewSize!.width;
 
+      // Reset outlier statistics
+      resetOutlierStats();
+
       // Check model availability after setting up face detection
       await checkModelAvailability();
     } catch (e) {
@@ -188,13 +284,37 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
       // Set saving status
       emit(state.copyWith(statusMessage: 'Saving $activityType data...'));
 
+      // Get coordinates from the queue
+      final originalCoordinates = _queueToList(state.queue);
+
+      // Filter outliers before saving - now replacing them, not removing
+      final filteredCoordinates = OutlierDetectionUtils.filterOutliersMAD(
+        originalCoordinates,
+        threshold: AppConstants.madOutlierThreshold,
+      );
+
+      // Find which points were adjusted
+      List<bool> adjustedPoints = _findAdjustedPoints(
+        originalCoordinates,
+        filteredCoordinates,
+      );
+
+      // Log outlier information
+      int outliers = adjustedPoints.where((adjusted) => adjusted).length;
+      if (outliers > 0) {
+        print(
+          'Outliers adjusted for saving: $outliers out of ${originalCoordinates.length}',
+        );
+      }
+
       // Create session with metadata
       final session = FaceTrackingSession(
         timestamp: DateTime.now(),
         activityType: activityType,
         sequenceLength: AppConstants.sequenceLength,
         cameraFps: AppConstants.cameraFps,
-        coordinates: _queueToList(state.queue),
+        coordinates:
+            filteredCoordinates, // Use the filtered (adjusted) coordinates
       );
 
       // Load existing data
@@ -219,9 +339,15 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
 
       print('Data saved to: ${_dataFile.path}');
 
-      // Update status message with success
+      // Update state with the filtered coordinates for visualization
       emit(
-        state.copyWith(statusMessage: '$activityType data saved successfully!'),
+        state.copyWith(
+          statusMessage: '$activityType data saved successfully!',
+          originalCoordinates: originalCoordinates,
+          filteredCoordinates: filteredCoordinates,
+          adjustedPoints: adjustedPoints,
+          currentOutliers: outliers,
+        ),
       );
 
       // Clear status message after a delay
@@ -297,6 +423,13 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
     }
   }
 
+  // Toggle outlier visualization
+  void toggleOutlierVisualization() {
+    emit(
+      state.copyWith(showOutlierVisualization: !state.showOutlierVisualization),
+    );
+  }
+
   Future<void> subscribeToFaceDetection() async {
     print('subscribing to face detection');
 
@@ -311,15 +444,22 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
             final smileProb = face['smilingProbability'];
             final centerX = face['center']['x'];
             final centerY = face['center']['y'];
-            // print('coordinates: $centerX, $centerY');
+
+            // Create a copy of the queue and add new data
+            final updatedQueue = CircularBuffer<List<double>>(
+              AppConstants.sequenceLength,
+            );
+            for (var i = 0; i < state.queue.length; i++) {
+              updatedQueue.add(List.from(state.queue[i]));
+            }
+            updatedQueue.add([centerX / _screenWidth, centerY / _screenHeight]);
+
             emit(
               state.copyWith(
                 isSmiling: smileProb > AppConstants.smilingThreshold,
                 centerX: centerX.toInt(),
                 centerY: centerY.toInt(),
-                queue:
-                    state.queue
-                      ..add([centerX / _screenWidth, centerY / _screenHeight]),
+                queue: updatedQueue,
               ),
             );
           });
