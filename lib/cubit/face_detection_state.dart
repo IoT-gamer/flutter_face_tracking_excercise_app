@@ -23,6 +23,12 @@ class FaceDetectionState extends Equatable {
   final int currentOutliers; // Outliers in current frame
   final double outlierPercentage; // Overall percentage of outliers
   final bool showOutlierVisualization;
+  // FFT-related fields
+  final double dominantFrequency;
+  final double maxAmplitude;
+  final List<double> frequencies;
+  final List<double> amplitudes;
+  final bool showFrequencyChart;
 
   const FaceDetectionState({
     this.cameraController,
@@ -44,6 +50,11 @@ class FaceDetectionState extends Equatable {
     required this.currentOutliers,
     required this.outlierPercentage,
     required this.showOutlierVisualization,
+    required this.dominantFrequency,
+    required this.maxAmplitude,
+    required this.frequencies,
+    required this.amplitudes,
+    required this.showFrequencyChart,
   });
 
   factory FaceDetectionState.initial() {
@@ -67,6 +78,11 @@ class FaceDetectionState extends Equatable {
       currentOutliers: 0,
       outlierPercentage: 0.0,
       showOutlierVisualization: false,
+      dominantFrequency: 0.0,
+      maxAmplitude: 0.0,
+      frequencies: const [],
+      amplitudes: const [],
+      showFrequencyChart: false,
     );
   }
 
@@ -91,6 +107,11 @@ class FaceDetectionState extends Equatable {
     currentOutliers,
     outlierPercentage,
     showOutlierVisualization,
+    dominantFrequency,
+    maxAmplitude,
+    frequencies,
+    amplitudes,
+    showFrequencyChart,
   ];
 
   @override
@@ -116,6 +137,11 @@ class FaceDetectionState extends Equatable {
     int? currentOutliers,
     double? outlierPercentage,
     bool? showOutlierVisualization,
+    double? dominantFrequency,
+    double? maxAmplitude,
+    List<double>? frequencies,
+    List<double>? amplitudes,
+    bool? showFrequencyChart,
   }) {
     return FaceDetectionState(
       cameraController: cameraController ?? this.cameraController,
@@ -139,6 +165,11 @@ class FaceDetectionState extends Equatable {
       outlierPercentage: outlierPercentage ?? this.outlierPercentage,
       showOutlierVisualization:
           showOutlierVisualization ?? this.showOutlierVisualization,
+      dominantFrequency: dominantFrequency ?? this.dominantFrequency,
+      maxAmplitude: maxAmplitude ?? this.maxAmplitude,
+      frequencies: frequencies ?? this.frequencies,
+      amplitudes: amplitudes ?? this.amplitudes,
+      showFrequencyChart: showFrequencyChart ?? this.showFrequencyChart,
     );
   }
 }

@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import '../constants/constants.dart';
 import '../device/mlkit_face_camera_repository.dart';
 import '../models/face_tracking_session.dart';
+import '../services/fft_service.dart';
 import '../services/model_service.dart';
 import '../utils/outlier_detection_utils.dart';
 
@@ -22,10 +23,12 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
     required ModelService modelService,
   }) : _mlkitFaceCameraRepository = mlkitFaceCameraRepository,
        _modelService = modelService,
+       _fftService = FFTService(),
        super(FaceDetectionState.initial());
 
   final MLKITFaceCameraRepository _mlkitFaceCameraRepository;
   final ModelService _modelService;
+  final FFTService _fftService;
 
   StreamSubscription? _faceDetectionStreamSubscription;
   CameraController? _cameraController;
@@ -33,6 +36,7 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
   late double _screenWidth;
   late double _screenHeight;
   Timer? _predictionTimer;
+  Timer? _fftTimer;
   static const String _faceDataFilename = AppConstants.faceDataFilename;
 
   // Get path for saving face detection result
@@ -105,10 +109,27 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
     }
   }
 
+  // Start periodic FFT computations
+  void startPeriodicFFT() {
+    if (_fftTimer == null) {
+      // Calculate FFT every 0.75 seconds
+      _fftTimer = Timer.periodic(
+        const Duration(milliseconds: 750),
+        (_) => _computeFFT(),
+      );
+    }
+  }
+
   // Stop periodic predictions
   void stopPeriodicPredictions() {
     _predictionTimer?.cancel();
     _predictionTimer = null;
+  }
+
+  // Stop periodic FFT computations
+  void stopPeriodicFFT() {
+    _fftTimer?.cancel();
+    _fftTimer = null;
   }
 
   // Compare original and filtered coordinates to find outliers with debugging
@@ -159,6 +180,56 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
         outlierPercentage: 0.0,
       ),
     );
+  }
+
+  // Extract X coordinates from a list of [x,y] coordinate pairs
+  List<double> _extractXCoordinates(List<List<double>> coordinates) {
+    return coordinates.map((point) => point[0]).toList();
+  }
+
+  // Compute FFT on the filtered coordinates
+  Future<void> _computeFFT() async {
+    // Minimum number of points needed for meaningful FFT
+    if (state.filteredCoordinates.length < 20) return;
+
+    try {
+      // Extract X coordinates from the filtered coordinates
+      // We use X coordinates as they typically represent horizontal movement
+      // which correlates well with walking/exercise patterns
+      final xCoordinates = _extractXCoordinates(state.filteredCoordinates);
+
+      // Compute the FFT
+      final fftResults = await _fftService.computeDominantFrequency(
+        xCoordinates,
+        AppConstants.cameraFps,
+      );
+
+      // Update state with the FFT results
+      // Note: We're no longer automatically setting showFrequencyChart based on valid data
+      emit(
+        state.copyWith(
+          dominantFrequency: fftResults['dominantFrequency'],
+          maxAmplitude: fftResults['maxAmplitude'],
+          frequencies: List<double>.from(fftResults['frequencies']),
+          amplitudes: List<double>.from(fftResults['amplitudes']),
+          // Keep the user's preference for chart visibility
+          // showFrequencyChart: fftResults['dominantFrequency'] > 0.0, // This was the problem!
+        ),
+      );
+
+      print('Dominant frequency: ${fftResults['dominantFrequency']} Hz');
+    } catch (e) {
+      print('Error computing FFT: $e');
+      // Don't update the state with error to avoid UI flicker
+    }
+  }
+
+  // Toggle frequency chart visibility
+  void toggleFrequencyChart() {
+    // Only toggle if we have valid data, otherwise always keep it off
+    if (state.dominantFrequency > 0.0 || state.showFrequencyChart) {
+      emit(state.copyWith(showFrequencyChart: !state.showFrequencyChart));
+    }
   }
 
   // Make a prediction using the loaded model
@@ -270,6 +341,9 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
 
       // Reset outlier statistics
       resetOutlierStats();
+
+      // Start with frequency chart hidden
+      emit(state.copyWith(showFrequencyChart: false));
 
       // Check model availability after setting up face detection
       await checkModelAvailability();
@@ -468,6 +542,9 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
       if (state.modelLoaded) {
         startPeriodicPredictions();
       }
+
+      // Start periodic FFT computations
+      startPeriodicFFT();
     } catch (e) {
       print('error subscribing to face detection');
       print(e);
@@ -481,6 +558,7 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
       await _faceDetectionStreamSubscription?.cancel();
       _faceDetectionStreamSubscription = null;
       stopPeriodicPredictions();
+      stopPeriodicFFT();
       stopCameraImageStream();
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
@@ -509,8 +587,10 @@ class FaceDetectionCubit extends Cubit<FaceDetectionState> {
   void cleanUp() {
     print('cleaning up');
     stopPeriodicPredictions();
+    stopPeriodicFFT();
     stopCameraImageStream();
     disposeStatefulIsolate();
     _modelService.dispose();
+    _fftService.dispose();
   }
 }

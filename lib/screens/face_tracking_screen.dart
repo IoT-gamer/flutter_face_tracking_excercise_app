@@ -7,6 +7,7 @@ import '../cubit/face_detection_cubit.dart';
 import '../device/mlkit_face_camera_repository.dart';
 import '../services/model_service.dart';
 import '../widgets/dot_painter.dart';
+import '../widgets/frequency_bar_chart_widget.dart';
 import '../widgets/metadata_indicator_widget.dart';
 import '../widgets/model_results_widget.dart';
 import '../widgets/outlier_visualization_widget.dart';
@@ -49,6 +50,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _customActivityController.dispose();
+    context.read<FaceDetectionCubit>().cleanUp();
     super.dispose();
   }
 
@@ -117,6 +119,20 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
 
+              // Frequency Bar Chart - placed near the bottom but above buttons
+              Positioned(
+                bottom: 200, // Position above the button panel
+                left: 0,
+                right: 0,
+                child: FrequencyBarChartWidget(
+                  dominantFrequency: state.dominantFrequency,
+                  maxAmplitude: state.maxAmplitude,
+                  frequencies: state.frequencies,
+                  amplitudes: state.amplitudes,
+                  isVisible: state.showFrequencyChart,
+                ),
+              ),
+
               // Status message display
               if (state.statusMessage.isNotEmpty)
                 Positioned(
@@ -163,7 +179,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
 
-              // Metadata indicator with outlier stats
+              // Metadata indicator with outlier stats and frequency toggle
               Positioned(
                 top: 10,
                 right: 10,
@@ -219,6 +235,49 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       ),
+                    // Frequency chart toggle button
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: GestureDetector(
+                        onTap: () {
+                          faceDetectionCubit.toggleFrequencyChart();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 5,
+                            horizontal: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                state.showFrequencyChart
+                                    ? Colors.blue.withOpacity(0.7)
+                                    : Colors.black.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                state.showFrequencyChart
+                                    ? Icons.analytics
+                                    : Icons.analytics_outlined,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Frequency Analysis',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  decoration: TextDecoration.none,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),

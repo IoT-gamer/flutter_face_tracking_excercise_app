@@ -12,6 +12,8 @@ The primary use case is positioning a phone or tablet on a stationary part of an
 
 - Real-time face detection and tracking
 - Advanced outlier detection and filtering using Median Absolute Deviation (MAD)
+- Frequency analysis using Fast Fourier Transform (FFT) to detect motion patterns
+- Walking frequency measurement in Hz and steps per minute
 - Recording of face position coordinates
 - Storage of activity data with proper labeling
 - Real-time activity prediction using a trained model
@@ -21,6 +23,7 @@ The primary use case is positioning a phone or tablet on a stationary part of an
   - Custom activities (user-defined)
 - Visual feedback with face tracking dot
 - Interactive outlier visualization
+- Real-time frequency spectrum visualization
 - Status messages for operation feedback
 - Data management (save/delete functionality)
 
@@ -43,6 +46,7 @@ The primary use case is positioning a phone or tablet on a stationary part of an
 - wakelock_plus: To keep screen on during tracking
 - tflite_flutter: For running trained ML models
 - flutter_archive: For handling model files
+- fftea: For frequency analysis of face movements
 
 ## Installation
 
@@ -74,6 +78,7 @@ flutter run
 6. Collect multiple samples for better ML training results
 7. Use the "Delete Data" button to clear all saved data if needed
 8. Toggle "Outlier Viz" to view outlier detection visualization
+9. Toggle "Frequency Analysis" to view motion frequency analysis
 
 ### Model Prediction Mode
 
@@ -83,6 +88,24 @@ If you have a trained model:
 2. Launch the app and tap "Start Detection"
 3. The app will automatically load the model and display real-time predictions of your activity
 4. The prediction includes the activity type and a confidence score
+
+### Frequency Analysis
+
+The app includes real-time frequency analysis of face movements:
+
+1. Start face detection
+2. Toggle the "Frequency Analysis" button to show/hide the frequency chart
+3. When walking or performing rhythmic exercises, the chart will display:
+   - The dominant frequency in Hz
+   - The equivalent steps per minute
+   - A visual spectrum of detected frequencies
+   - A frequency meter showing the intensity relative to normal walking range
+
+This feature is particularly useful for:
+- Measuring walking or running cadence
+- Analyzing rhythmic exercise patterns
+- Providing real-time feedback for exercise intensity
+- Detecting changes in movement patterns
 
 ## Data Format
 
@@ -128,6 +151,21 @@ The app implements the Median Absolute Deviation (MAD) algorithm to detect and h
 
 This outlier filtering improves model prediction accuracy and ensures higher quality training data by smoothing out erratic movements or tracking errors.
 
+### Frequency Analysis
+
+The app uses Fast Fourier Transform (FFT) to analyze the frequency patterns in face movements:
+
+- **Implementation**: Uses the `fftea` package to compute FFT on filtered coordinate data
+- **Processing**: FFT is performed on the x-coordinates after outlier removal
+- **Performance**: Computations are offloaded to an isolate to maintain UI responsiveness
+- **Visualization**: Shows dominant frequency, frequency spectrum, and equivalent steps per minute
+- **Typical Values**: Normal walking is typically in the 1.5-2.5 Hz range (90-150 steps/min)
+
+The frequency analysis is particularly useful for:
+- Quantifying rhythmic activities like walking and running
+- Comparing exercise intensity across sessions
+- Detecting changes in movement patterns that may not be visually apparent
+
 ## Data Storage Location
 
 The data is stored in the device's local storage. The app uses the `path_provider` package to determine the correct directory for saving files.
@@ -155,11 +193,13 @@ lib/
 ├── screens/
 │   └── face_tracking_screen.dart    # Main UI screen
 ├── services/
-│   └── model_service.dart     # TensorFlow Lite model handling
+│   ├── model_service.dart     # TensorFlow Lite model handling
+│   └── fft_service.dart       # Fast Fourier Transform service
 ├── utils/
 │   └── outlier_detection_utils.dart # MAD outlier detection algorithm
 ├── widgets/
 │   ├── dot_painter.dart       # Visual indicator for face tracking
+│   ├── frequency_bar_chart_widget.dart # Display for frequency analysis
 │   ├── metadata_indicator_widget.dart  # Display for FPS and points info
 │   ├── model_results_widget.dart  # Display for model predictions
 │   ├── outlier_visualization_widget.dart # Visualization for outlier detection
@@ -220,6 +260,7 @@ To add predefined activity types:
 - **Model not loading**: Ensure model files are in the correct location and pubspec.yaml is properly configured
 - **Poor predictions**: Collect more training data or adjust the model architecture in the Python script
 - **Low outlier detection**: Adjust the `madOutlierThreshold` constant (lower values increase sensitivity)
+- **Frequency analysis not working**: Ensure there is enough face movement data and try adjusting device position
 
 ## Contributing
 
@@ -234,3 +275,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Google ML Kit for face detection capabilities
 - TensorFlow Lite for on-device machine learning inferencing
 - Flutter team for the excellent framework
+- fftea package for Fast Fourier Transform calculations
